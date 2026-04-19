@@ -1,4 +1,6 @@
 fastapi
+openai
+google-generativeai
 uvicorn[standard]
 pydantic
 slowapi

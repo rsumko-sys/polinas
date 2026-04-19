@@ -1,19 +1,13 @@
 try:
-    import openai
-except Exception:
-    openai = None
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None
 import re
 from app.config import OPENAI_API_KEY, OPENAI_MODEL
 from app.models import Issue, Drill, TrainingPlan
-from typing import Any
+from typing import Any, Optional
 from datetime import datetime
 import logging
-
-if openai is not None:
-    try:
-        openai.api_key = OPENAI_API_KEY
-    except Exception:
-        pass
 
 logger = logging.getLogger(__name__)
 
@@ -60,22 +54,26 @@ SUCCESS CRITERIA: {{критерій}}
 """
 
 
-def generate_chain(session_data: dict[str, Any]) -> tuple[Issue, Drill, TrainingPlan]:
+def generate_chain(session_data: dict[str, Any], api_key: Optional[str] = None) -> tuple[Issue, Drill, TrainingPlan]:
+    # Use provided key or fall back to env
+    effective_key = api_key or OPENAI_API_KEY
+    
     # Build prompt
     prompt = PROMPT_TEMPLATE.format(**session_data)
 
     # If no API key is configured, skip external call and use deterministic fallback
-    if not OPENAI_API_KEY:
-        logger.info("OPENAI_API_KEY not set; using local fallback for generate_chain")
+    if not effective_key or not OpenAI:
+        logger.info("OPENAI_API_KEY not set or library missing; using local fallback")
         from datetime import datetime as _dt
         issue = Issue(name="No API - posture drift", category="position", description="Fallback issue: horse shortens neck.", trigger="when tired", severity="low", pattern="occasional")
         drill = Drill(name="Stretch trot", goal="Encourage extension", category="rhythm", difficulty="easy", instructions="1. Warm up. 2. Long rein trot.", progression="add poles")
         plan = TrainingPlan(title=f"Plan for {issue.name}", date=_dt.now(), session_type=session_data.get('type','flat'), focus_issue=issue.name, drills=[], duration_min=30, notes="Fallback plan")
         return issue, drill, plan
 
-    # Attempt OpenAI call; on failure, log and fall back to deterministic response
+    # Attempt OpenAI call
     try:
-        response = openai.ChatCompletion.create(
+        client = OpenAI(api_key=effective_key)
+        response = client.chat.completions.create(
             model=OPENAI_MODEL,
             messages=[
                 {"role": "system", "content": "Ти помічник з навчання верховій їзді. Повертай тільки текст у вказаному форматі."},
@@ -83,16 +81,11 @@ def generate_chain(session_data: dict[str, Any]) -> tuple[Issue, Drill, Training
             ],
             temperature=0.7,
         )
-        # Defensive access to response content
-        text = getattr(response, 'choices', [None])[0]
-        if text and hasattr(text, 'message') and hasattr(text.message, 'content'):
-            text = text.message.content
-        else:
-            text = str(response)
+        text = response.choices[0].message.content
     except Exception as exc:
         logger.exception("OpenAI call failed in generate_chain; using fallback: %s", exc)
         from datetime import datetime as _dt
-        issue = Issue(name="No API - posture drift", category="position", description="Fallback issue: horse shortens neck.", trigger="when tired", severity="low", pattern="occasional")
+        issue = Issue(name="API Error - posture drift", category="position", description="API call failed.", trigger="error", severity="low", pattern="occasional")
         drill = Drill(name="Stretch trot", goal="Encourage extension", category="rhythm", difficulty="easy", instructions="1. Warm up. 2. Long rein trot.", progression="add poles")
         plan = TrainingPlan(title=f"Plan for {issue.name}", date=_dt.now(), session_type=session_data.get('type','flat'), focus_issue=issue.name, drills=[], duration_min=30, notes="Fallback plan")
         return issue, drill, plan
@@ -100,6 +93,7 @@ def generate_chain(session_data: dict[str, Any]) -> tuple[Issue, Drill, Training
     issue_block = re.search(r"====================\nISSUE\n====================(.*?)\n--------------------", text, re.DOTALL)
     drill_block = re.search(r"====================\nDRILL\n====================(.*?)\n--------------------", text, re.DOTALL)
     plan_block = re.search(r"====================\nPLAN.*?\n====================(.*?)\n====================", text, re.DOTALL)
+
 
     # Ensure regex matches before calling .group() (satisfy mypy and avoid runtime errors)
     assert issue_block is not None and drill_block is not None and plan_block is not None

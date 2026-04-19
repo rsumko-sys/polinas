@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
 import uuid
 import tempfile
-from datetime import datetime
-import math
 from typing import Any, Dict, List, Optional, Mapping, cast, Callable
 
 from fastapi import FastAPI, UploadFile, File, Form, Depends, Request, HTTPException, Query, Header, BackgroundTasks
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 
 from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -18,7 +18,7 @@ from slowapi.errors import RateLimitExceeded
 
 from .security import require_api_key
 
-from app.data.kharkiv_clubs import CLUBS_DATA, generate_club_map
+from app.data.kharkiv_clubs import generate_club_map
 from app.services.clubs_service import ClubsService
 from app.gateway import dispatch_clubs_nearest
 from app.models import SessionData, Rune
@@ -63,6 +63,15 @@ except Exception:
 
 
 app = FastAPI(title="Horse Training Intelligence Platform")
+
+# CORS setup
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -180,7 +189,7 @@ def health_check() -> Dict[str, str]:
 
 @app.get("/clubs")
 def get_clubs() -> Dict[str, Any]:
-    return {"data": CLUBS_DATA}
+    return {"data": ClubsService().get_all_clubs()}
 
 
 @app.get("/clubs/nearest")
@@ -273,6 +282,7 @@ async def ingest_session(
     notes_raw: str = Form(...),
     video: Optional[UploadFile] = File(None),
     gpx: Optional[UploadFile] = File(None),
+    x_openai_key: Optional[str] = Header(None, alias="X-OpenAI-Key"),
 ) -> JSONResponse:
     video_url: Optional[str] = None
     gpx_url: Optional[str] = None
@@ -317,7 +327,7 @@ async def ingest_session(
     def _persist_to_notion(sync_session_dict: dict, video_u: Optional[str], gpx_u: Optional[str]) -> None:
         try:
             generate_chain_any = cast(Any, _generate_chain)
-            issue, drill, plan = generate_chain_any(sync_session_dict)
+            issue, drill, plan = generate_chain_any(sync_session_dict, api_key=x_openai_key)
 
             created_session_id = notion.create_session(sync_session_dict, video_u, gpx_u)
             issue.session_id = created_session_id
@@ -347,7 +357,7 @@ async def ingest_session(
 
     # generate_chain is untyped; call via Any to avoid mypy no-untyped-call
     generate_chain_any = cast(Any, _generate_chain)
-    issue, drill, plan = generate_chain_any(session_dict)
+    issue, drill, plan = generate_chain_any(session_dict, api_key=x_openai_key)
 
     # store results in Notion (or in-memory fallback)
     issue.session_id = session_id
@@ -375,3 +385,52 @@ async def run_osint() -> Any:
 @app.get("/pid/status")
 def pid_status() -> Dict[str, Any]:
     return {"Kp": getattr(pid, "Kp", None), "Ki": getattr(pid, "Ki", None), "Kd": getattr(pid, "Kd", None)}
+
+class RouteAnalysisReq(BaseModel):
+    distance_km: float
+    elevation_m: float
+
+@app.post("/route/analyze")
+def analyze_route_endpoint(req: RouteAnalysisReq, x_openai_key: Optional[str] = Header(None, alias="X-OpenAI-Key")) -> Dict[str, str]:
+    from app.route_ai import analyze_route
+    difficulty, comment = analyze_route(req.distance_km, req.elevation_m, api_key=x_openai_key)
+    return {"difficulty": difficulty, "comment": comment}
+
+class OracleReq(BaseModel):
+    question: str
+
+@app.post("/oracle/ask")
+def oracle_ask(req: OracleReq, x_openai_key: Optional[str] = Header(None, alias="X-OpenAI-Key")) -> Dict[str, str]:
+    effective_key = x_openai_key or os.getenv("OPENAI_API_KEY")
+    if not effective_key:
+        return {"answer": "Оракул мовчить, доки не введено магічний ключ API."}
+    
+    # Detect key type
+    is_gemini = effective_key.startswith("AIza")
+
+    if is_gemini:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=effective_key)
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            prompt = f"Ти Оракул для вершників. Відповідай готично, містично, але професійно. Твої відповіді короткі (до 3 речень). Питання: {req.question}"
+            response = model.generate_content(prompt)
+            return {"answer": response.text}
+        except Exception as e:
+            return {"answer": f"Зірки Gemini затуманені... (Помилка: {str(e)})"}
+    else:
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=effective_key)
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "Ти Оракул для вершників. Відповідай готично, містично, але професійно. Твої відповіді короткі (до 3 речень)."},
+                    {"role": "user", "content": req.question}
+                ],
+                temperature=0.8,
+                max_tokens=150
+            )
+            return {"answer": response.choices[0].message.content}
+        except Exception as e:
+            return {"answer": f"Туман застилає видіння OpenAI... (Помилка: {str(e)})"}
