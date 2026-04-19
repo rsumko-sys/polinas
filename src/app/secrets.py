@@ -1,7 +1,5 @@
 import os
 from typing import Dict, List
-import os
-from typing import Dict
 
 ENV_PATH = os.path.join(os.getcwd(), '.env')
 
@@ -49,7 +47,7 @@ def set_env_var(key: str, value: str, path: str = ENV_PATH) -> None:
 
 def delete_env_var(key: str, path: str = ENV_PATH) -> None:
     lines = _read_lines(path)
-    out = [l for l in lines if not l.strip().startswith(f"{key}=")]
+    out = [line for line in lines if not line.strip().startswith(f"{key}=")]
     _write_lines(out, path)
 
 

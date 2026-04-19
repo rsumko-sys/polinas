@@ -1,4 +1,7 @@
-import openai
+try:
+    import openai
+except Exception:
+    openai = None
 import re
 from app.config import OPENAI_API_KEY, OPENAI_MODEL
 from app.models import Issue, Drill, TrainingPlan
@@ -6,7 +9,11 @@ from typing import Any
 from datetime import datetime
 import logging
 
-openai.api_key = OPENAI_API_KEY
+if openai is not None:
+    try:
+        openai.api_key = OPENAI_API_KEY
+    except Exception:
+        pass
 
 logger = logging.getLogger(__name__)
 

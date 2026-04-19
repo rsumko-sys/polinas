@@ -2,14 +2,52 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-import networkx as nx
-from neo4j import GraphDatabase
+# networkx and neo4j are optional runtime dependencies for the OSINT pipeline.
+# Provide lightweight fallbacks so the app can start in developer environments
+# without installing heavy graph or database packages.
+try:
+    import networkx as nx
+except Exception:
+    nx = None
+
+try:
+    from neo4j import GraphDatabase
+except Exception:
+    GraphDatabase = None
+
 from app.config import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
+
+
+class _SimpleGraph:
+    def __init__(self) -> None:
+        self._nodes: Dict[str, Dict[str, Any]] = {}
+        self._edges: List[tuple[str, str, Dict[str, Any]]] = []
+
+    def add_node(self, name: str, **data: Any) -> None:
+        self._nodes[name] = data
+
+    def add_edge(self, u: str, v: str, **data: Any) -> None:
+        self._edges.append((u, v, data))
+
+    def nodes(self, data: bool = False) -> Any:
+        if data:
+            return list(self._nodes.items())
+        return list(self._nodes.keys())
+
+    def edges(self, data: bool = False) -> Any:
+        if data:
+            return [(u, v, d) for (u, v, d) in self._edges]
+        return [(u, v) for (u, v, _) in self._edges]
+
 
 
 class OSINTPipeline:
     def __init__(self) -> None:
-        self.graph: nx.Graph = nx.Graph()
+        if nx is not None:
+            graph_obj = nx.Graph()
+        else:
+            graph_obj = _SimpleGraph()
+        self.graph: Any = graph_obj
         self.neo4j_driver: Optional[Any] = None
         # Create Neo4j driver only if URI is configured; otherwise operate in-memory
         if NEO4J_URI:

@@ -4,9 +4,10 @@ import os
 import uuid
 import tempfile
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Mapping, cast
+import math
+from typing import Any, Dict, List, Optional, Mapping, cast, Callable
 
-from fastapi import FastAPI, UploadFile, File, Form, Depends, Request, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, Depends, Request, HTTPException, Query
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -19,9 +20,6 @@ from .security import require_api_key
 
 from app.data.kharkiv_clubs import CLUBS_DATA, generate_club_map
 from app.models import SessionData, Rune
-from app.ingest_gpx import parse_gpx
-from app.ingest_video import get_video_metadata
-from app.storage.s3_storage import S3Storage
 from app.notion_client import NotionClient
 from app.config import NOTION_TOKEN, NOTION_SESSIONS_DB_ID
 from app.ai_chain import generate_chain as _generate_chain
@@ -30,13 +28,44 @@ from app.osint_pipeline import OSINTPipeline
 from app.runes import get_rune_manager
 from app import secrets as secrets_helper
 
+# Optional heavy-dep fallbacks (imported after core imports to satisfy linters)
+parse_gpx: Callable[[str], Any]
+try:
+    from app.ingest_gpx import parse_gpx as _parse_gpx
+    parse_gpx = _parse_gpx
+except Exception:
+    def parse_gpx(path: str) -> Any:
+        # lightweight fallback when gpxpy isn't installed
+        return {}
+
+get_video_metadata: Callable[[str], Any]
+try:
+    from app.ingest_video import get_video_metadata as _get_video_metadata
+    get_video_metadata = _get_video_metadata
+except Exception:
+    def get_video_metadata(path: str) -> Any:
+        # lightweight fallback when moviepy or ffmpeg isn't available
+        return {}
+
+S3Storage: Any
+try:
+    from app.storage.s3_storage import S3Storage as _RealS3Storage
+    S3Storage = _RealS3Storage
+except Exception:
+    class _FallbackS3Storage:
+        def __init__(self, *a: Any, **k: Any) -> None:
+            pass
+        def upload_file(self, path: str, key: str) -> str:
+            return ""
+    S3Storage = _FallbackS3Storage
+
 
 app = FastAPI(title="Horse Training Intelligence Platform")
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, cast(Any, _rate_limit_exceeded_handler))
 
 
 class InMemoryNotion:
@@ -93,6 +122,7 @@ def ui_index() -> HTMLResponse:
     return HTMLResponse("<html><body><h1>Polina's Diaries</h1></body></html>")
 
 
+
 @app.get('/ui/dashboard')
 def ui_dashboard() -> HTMLResponse:
     path = os.path.join(static_dir, 'ui_dashboard.html')
@@ -100,6 +130,25 @@ def ui_dashboard() -> HTMLResponse:
         with open(path, 'r', encoding='utf-8') as f:
             return HTMLResponse(content=f.read())
     return HTMLResponse('<html><body><h1>Dashboard</h1></body></html>')
+
+
+# Serve stub sessions page
+@app.get('/ui/sessions')
+def ui_sessions() -> HTMLResponse:
+    path = os.path.join(static_dir, 'ui_sessions.html')
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse('<html><body><h1>Sessions (stub)</h1></body></html>')
+
+# Serve stub training plans page
+@app.get('/ui/trainingplans')
+def ui_trainingplans() -> HTMLResponse:
+    path = os.path.join(static_dir, 'ui_trainingplans.html')
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse('<html><body><h1>Training Plans (stub)</h1></body></html>')
 
 
 class SecretIn(BaseModel):
@@ -141,6 +190,41 @@ def health_check() -> Dict[str, str]:
 @app.get("/clubs")
 def get_clubs() -> Dict[str, Any]:
     return {"data": CLUBS_DATA}
+
+
+@app.get("/clubs/nearest")
+def clubs_nearest(
+    lat: float = Query(..., description="Latitude of the user"),
+    lon: float = Query(..., description="Longitude of the user"),
+    limit: int = Query(1, ge=1, le=50, description="Maximum number of results to return"),
+) -> Dict[str, Any]:
+    """Return nearest horse clubs to the given coordinates using the Haversine formula.
+    """
+    def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        R = 6371.0  # Earth radius in kilometers
+        phi1 = math.radians(lat1)
+        phi2 = math.radians(lat2)
+        dphi = math.radians(lat2 - lat1)
+        dlambda = math.radians(lon2 - lon1)
+        a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+        return R * (2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
+
+    found: List[Dict[str, object]] = []
+    for club in CLUBS_DATA:
+        lat2 = club.get("latitude")
+        lon2 = club.get("longitude")
+        if lat2 is None or lon2 is None:
+            continue
+        try:
+            dist = haversine(float(lat), float(lon), float(lat2), float(lon2))
+        except Exception:
+            continue
+        entry = dict(club)
+        entry["distance_km"] = dist
+        found.append(entry)
+
+    found.sort(key=lambda x: x.get("distance_km", float("inf")))
+    return {"clubs": found[:limit]}
 
 
 @app.post("/clubs/map")

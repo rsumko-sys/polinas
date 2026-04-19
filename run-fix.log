@@ -1,0 +1,15 @@
+Current branch: deploy/init
+pre-commit not installed, skipping hooks
+No modified source/yaml/ini/txt/md files to stage
+Added mypy.ini
+Added .github/workflows/ci-strict.yml
+Staged status:
+ M src/app/__pycache__/ai_chain.cpython-314.pyc
+ M src/app/__pycache__/models.cpython-314.pyc
+?? run-fix.log
+?? run_fix.sh
+No staged changes to commit
+Pushing branch deploy/init to origin
+Everything up-to-date
+gh CLI not found; PR not created automatically
+Done

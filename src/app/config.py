@@ -1,11 +1,7 @@
 import os
-
-# Minimal config shim — reads env vars for Notion integration if present.
-NOTION_TOKEN = os.environ.get("NOTION_TOKEN")
-NOTION_SESSIONS_DB_ID = os.environ.get("NOTION_SESSIONS_DB_ID")
-import os
 from dotenv import load_dotenv
 
+# Load .env early so env lookups pick up local values during development
 load_dotenv()
 
 # Notion

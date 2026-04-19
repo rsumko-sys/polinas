@@ -1,3 +1,25 @@
+FROM python:3.14-slim
+
+ENV PYTHONUNBUFFERED=1
+WORKDIR /app
+
+# Copy project sources
+COPY . /app
+
+# Install system deps needed for some optional libs
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential gcc libpq-dev ffmpeg ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m pip install --upgrade pip
+
+# If a requirements file is present, install from it; otherwise install a minimal set
+RUN if [ -f requirements.txt ]; then pip install -r requirements.txt; \
+    else pip install fastapi uvicorn pydantic python-dotenv slowapi pytest mypy ruff boto3; fi
+
+ENV PYTHONPATH=/app/src
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1

@@ -1,0 +1,195 @@
+:root {
+  --accent: #ff4b4b;
+  --bg: #18181a;
+  --fg: #fff;
+  --muted: #bdbdbd;
+}
+body { background: var(--bg); color: var(--fg); }
+.muted { color: var(--muted); }
+.btn { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 10px 20px; cursor: pointer; }
+.btn:hover { background: #ff6b6b; }/* Theme extracted and adapted from Polinas Diaries App - gothic palette */
+:root{
+  /* One UI-inspired accessible palette (mobile-first) */
+  --bg: #0b1220;
+  --card: #0f1724;
+  --accent: #2962ff; /* One UI blue accent */
+  --accent-strong: #1e40ff;
+  --muted: #9aa7b1;
+  --text: #eef2ff;
+  --btn-text: #ffffff;
+  --radius:12px;
+  --spacing-sm:8px;
+  --spacing-md:16px;
+  --spacing-lg:24px;
+  /* elevation tokens */
+  --elevation-1: 0 6px 18px rgba(0,0,0,0.45);
+  --elevation-2: 0 10px 30px rgba(0,0,0,0.55);
+  --elevation-3: 0 18px 60px rgba(0,0,0,0.7);
+  --focus-ring: rgba(41,98,255,0.22);
+}
+.body-font{font-family:Inter, "Cormorant Garamond", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif}
+body{background:linear-gradient(180deg,var(--bg) 0%,#07040f 100%);color:var(--text);margin:0}
+.app-shell{max-width:1100px;margin:var(--spacing-lg) auto;padding:var(--spacing-md);background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:var(--radius);box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+.brand{display:flex;align-items:center;gap:16px}
+.brand h1{margin:0;font-size:22px;letter-spacing:0.04em;font-family:Cormorant Garamond, serif}
+.brand .ornament{width:44px;height:44px;border-radius:8px;background:var(--card);display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.03)}
+.brand .ornament img{width:40px;height:40px;display:block;transition:transform 300ms ease;animation:ornamentPulse 4s ease-in-out 1s infinite}
+
+@keyframes ornamentPulse{
+  0%{transform:translateY(0) rotate(0deg) scale(1)}
+  40%{transform:translateY(-3px) rotate(-2deg) scale(1.02)}
+  60%{transform:translateY(0) rotate(2deg) scale(1)}
+  100%{transform:translateY(0) rotate(0deg) scale(1)}
+}
+.grid{display:grid;grid-template-columns:1fr 320px;gap:var(--spacing-md);margin-top:var(--spacing-md)}
+.card{background:var(--card);padding:var(--spacing-md);border-radius:10px;border:1px solid rgba(255,255,255,0.03)}
+.muted{color:var(--muted);font-size:14px}
+.btn{display:inline-block;padding:10px 14px;background:var(--accent);color:var(--btn-text);border-radius:10px;text-decoration:none;font-weight:700}
+.form-row{display:flex;gap:var(--spacing-sm);align-items:center}
+/* gothic opera flair */
+.ornament:after{content:"";display:block;width:22px;height:2px;background:rgba(255,255,255,0.06);margin-top:6px}
+
+/* Sidebar navigation */
+.sidebar{position:fixed;left:18px;top:24px;width:88px;bottom:24px;display:flex;flex-direction:column;gap:12px;padding:12px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:14px;border:1px solid rgba(255,255,255,0.03);align-items:center;box-shadow:0 12px 30px rgba(0,0,0,0.6)}
+.sidebar .nav-item{display:flex;flex-direction:column;align-items:center;gap:6px;text-decoration:none;color:var(--muted);width:56px;padding:8px;border-radius:10px}
+.sidebar .nav-item .icon{width:28px;height:28px;color:var(--accent);opacity:0.98}
+.sidebar .nav-item span{font-size:12px;color:var(--muted);display:block;text-align:center}
+.sidebar .nav-item:hover{background:linear-gradient(180deg, rgba(41,98,255,0.06), rgba(41,98,255,0.03));color:var(--accent-strong);box-shadow:0 8px 24px rgba(30,64,255,0.06)}
+.sidebar .nav-item:focus{outline:3px solid rgba(41,98,255,0.14);outline-offset:3px}
+
+/* compact responsive behavior */
+@media (max-width:900px){
+  .sidebar{position:static;flex-direction:row;width:auto;padding:8px;gap:8px;border-radius:10px}
+  .grid{grid-template-columns:1fr}
+  .app-shell{margin:16px;padding:12px}
+  .brand h1{font-size:20px}
+  .card{padding:12px}
+}
+
+/* Segmented tabs (top) */
+.segmented-tabs{display:flex;gap:8px;background:transparent;padding:6px;margin:8px 0}
+.seg-tab{padding:8px 12px;border-radius:999px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--muted);font-weight:600;font-size:13px;cursor:pointer}
+.seg-tab[aria-selected="true"]{background:var(--card);color:var(--accent-strong);border-color:rgba(41,98,255,0.12);box-shadow:0 6px 14px rgba(30,64,255,0.04) inset}
+.seg-tab:focus{outline:3px solid rgba(41,98,255,0.14);outline-offset:3px}
+
+/* Prefer reduced motion for users who request it */
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important}
+}
+
+/* Use focus-visible for better keyboard accessibility */
+.seg-tab:focus-visible, .tab-item:focus-visible, .horseshoe-btn:focus-visible, .sidebar .nav-item:focus-visible{
+  outline:3px solid var(--focus-ring);
+  outline-offset:3px;
+}
+
+/* ARIA live region styling (hidden visually but available to screen readers) */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* Bottom navigation (mobile) */
+.bottom-nav{position:fixed;left:12px;right:12px;bottom:12px;margin:0 auto;max-width:720px;display:flex;justify-content:space-between;gap:8px;padding:8px;background:linear-gradient(180deg,rgba(0,0,0,0.18),rgba(0,0,0,0.06));border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:60}
+.tab-item{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 10px;border-radius:10px;background:transparent;border:none;color:var(--muted);min-width:56px;min-height:44px;cursor:pointer;font-size:12px}
+.tab-item .icon{font-size:20px;color:var(--accent)}
+.tab-item[aria-selected="true"]{background:linear-gradient(180deg, rgba(41,98,255,0.12), rgba(41,98,255,0.06));color:var(--text);box-shadow:0 6px 18px rgba(30,64,255,0.08)}
+.tab-item:focus{outline:3px solid rgba(41,98,255,0.14);outline-offset:3px}
+
+@media (min-width:900px){
+  .bottom-nav{display:none}
+}
+
+/* Horseshoe CTA button */
+.horseshoe-btn{
+  --size:64px;
+  width:var(--size);height:var(--size);border-radius:18px;display:inline-flex;align-items:center;justify-content:center;
+  background:linear-gradient(180deg, rgba(41,98,255,0.12), rgba(41,98,255,0.04));
+  color:var(--text);border:1px solid rgba(255,255,255,0.06);box-shadow:var(--elevation-2);cursor:pointer;
+  transition:transform 200ms cubic-bezier(.2,.9,.2,1), box-shadow 200ms ease, filter 200ms ease;
+}
+.horseshoe-btn svg{width:48px;height:48px}
+.horseshoe-btn:hover{transform:translateY(-6px) scale(1.04);box-shadow:var(--elevation-3);filter:drop-shadow(0 20px 40px rgba(12,18,40,0.6))}
+.horseshoe-btn:active{transform:translateY(-2px) scale(0.98);box-shadow:var(--elevation-1)}
+.horseshoe-btn:focus{outline:3px solid rgba(41,98,255,0.16);outline-offset:4px}
+
+/* small label under horseshoe, if needed */
+.horseshoe-label{display:block;text-align:center;margin-top:6px;color:var(--muted);font-size:12px}
+
+/* Sound toggle switch */
+.sound-toggle{display:inline-block;position:relative;width:44px;height:26px}
+.sound-toggle input{display:none}
+.sound-toggle .switch{position:absolute;inset:0;border-radius:999px;background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.08));box-shadow:inset 0 2px 4px rgba(0,0,0,0.4);transition:background 180ms ease}
+.sound-toggle .switch:after{content:"";position:absolute;left:4px;top:4px;width:18px;height:18px;border-radius:50%;background:var(--card);box-shadow:0 4px 10px rgba(0,0,0,0.6);transition:transform 180ms cubic-bezier(.2,.9,.2,1)}
+.sound-toggle input:checked + .switch{background:linear-gradient(90deg, rgba(41,98,255,0.20), rgba(30,64,255,0.06))}
+.sound-toggle input:checked + .switch:after{transform:translateX(18px)}
+.sound-toggle[title]{cursor:pointer}
+
+/* Rune-on-stone aesthetic */
+.rune-grid{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px}
+.rune-stone{
+  width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.02), transparent 10%),
+              linear-gradient(180deg,#2a2d31 0%, #131418 100%);
+  box-shadow: inset -6px -6px 14px rgba(0,0,0,0.7), inset 6px 6px 18px rgba(255,255,255,0.02), var(--elevation-1);
+  border:1px solid rgba(255,255,255,0.03);position:relative;overflow:hidden;
+  transition:transform 220ms cubic-bezier(.2,.9,.2,1), box-shadow 220ms ease, filter 220ms ease;
+}
+.rune-stone:before{
+  /* subtle crack pattern using radial gradient */
+  content:"";position:absolute;inset:0;opacity:0.14;mix-blend-mode:overlay;
+  background-image:radial-gradient(circle at 40% 30%, rgba(255,255,255,0.02), transparent 6%),
+                    radial-gradient(circle at 70% 70%, rgba(255,255,255,0.01), transparent 8%);
+}
+.rune-icon{color:var(--text);font-family: 'Cormorant Garamond', serif;font-size:26px;mix-blend-mode:screen;text-shadow:0 2px 0 rgba(0,0,0,0.6)}
+.rune-stone .sigil{position:relative;z-index:2;transform:translateY(-2px)}
+.rune-caption{font-size:12px;color:var(--muted);text-align:center;margin-top:6px}
+
+/* alternative square rune tile */
+.rune-tile{width:72px;height:72px;border-radius:12px;background:linear-gradient(180deg,#26282b,#151616);display:flex;align-items:center;justify-content:center;box-shadow:var(--elevation-1);border:1px solid rgba(255,255,255,0.03);transition:transform 220ms ease, box-shadow 220ms ease, filter 220ms ease}
+
+/* Hover / active states for depth */
+.rune-stone:hover, .rune-tile:hover{transform:translateY(-6px) scale(1.04);box-shadow:var(--elevation-2);filter:drop-shadow(0 10px 30px rgba(0,0,0,0.6))}
+.rune-stone:active, .rune-tile:active{transform:translateY(-2px) scale(0.98);box-shadow:var(--elevation-1);filter:none}
+
+/* inner glow for active rune */
+.rune-stone.active, .rune-tile.active{box-shadow:0 10px 30px rgba(30,64,255,0.14), inset -6px -6px 18px rgba(0,0,0,0.7);}
+
+
+
+/* Splash / entry animation */
+.splash-overlay{
+  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:9999;background:linear-gradient(180deg, rgba(11,6,32,0.98), rgba(7,4,15,0.95));backdrop-filter: blur(2px);
+}
+.splash-card{display:flex;flex-direction:column;align-items:center;gap:12px}
+
+/* Splash / entry animation */
+.splash-logo{width:380px;height:auto;transform:scale(0.85);opacity:0;animation:logoIn 1100ms cubic-bezier(.2,.9,.2,1) forwards}
+.splash-sub{color:var(--muted);opacity:0;transform:translateY(10px);animation:subIn 800ms 900ms ease forwards}
+
+/* After intro, keep splash logo gently floating */
+.splash-logo{
+  animation: logoIn 1100ms cubic-bezier(.2,.9,.2,1) forwards, float 6s ease-in-out 1.2s infinite;
+}
+
+@keyframes float{
+  0%{transform:translateY(0) scale(1)}
+  50%{transform:translateY(-6px) scale(1.01)}
+  100%{transform:translateY(0) scale(1)}
+}
+
+/* subtle shimmer on splash subtext */
+.splash-sub{animation:subIn 800ms 900ms ease forwards, shimmer 3.6s linear 2s infinite}
+@keyframes shimmer{0%{filter:brightness(1)}50%{filter:brightness(1.08)}100%{filter:brightness(1)}}
+
+@keyframes logoIn{
+  0%{transform:scale(0.6) rotate(-6deg);opacity:0}
+  60%{transform:scale(1.04) rotate(2deg);opacity:1}
+  100%{transform:scale(1) rotate(0)}
+}
+
+@keyframes subIn{
+  to{opacity:1;transform:translateY(0)}
+}
+
+/* splash exit animation */
+.splash-hide{animation:fadeOut 600ms ease forwards}
+@keyframes fadeOut{to{opacity:0;transform:translateY(-8px);visibility:hidden}}
+

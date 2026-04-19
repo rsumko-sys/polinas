@@ -1,7 +1,13 @@
 import os
 import shutil
-import boto3
 from typing import Any
+
+# boto3 is an optional dependency; avoid import-time failures in lightweight
+# developer environments by making it optional and falling back to local storage.
+try:
+    import boto3
+except Exception:
+    boto3 = None
 
 try:
     from botocore.client import Config
@@ -28,19 +34,23 @@ class S3Storage:
         self.client: Any = None
         # Defer network calls until an upload is attempted to avoid long
         # import-time delays when MinIO is not available in the environment.
-        try:
-            kwargs = dict(
-                service_name='s3',
-                endpoint_url=f'http://{MINIO_ENDPOINT}',
-                aws_access_key_id=MINIO_ACCESS_KEY,
-                aws_secret_access_key=MINIO_SECRET_KEY,
-                region_name='us-east-1'
-            )
-            if Config is not None:
-                kwargs['config'] = Config(signature_version='s3v4')
-            # note: boto3 may raise if network unreachable; catch broadly
-            self.client = boto3.client(**kwargs)
-        except Exception:
+        # Only attempt to initialize a boto3 client if the library is present
+        if boto3 is not None:
+            try:
+                kwargs = dict(
+                    service_name='s3',
+                    endpoint_url=f'http://{MINIO_ENDPOINT}',
+                    aws_access_key_id=MINIO_ACCESS_KEY,
+                    aws_secret_access_key=MINIO_SECRET_KEY,
+                    region_name='us-east-1'
+                )
+                if Config is not None:
+                    kwargs['config'] = Config(signature_version='s3v4')
+                # note: boto3 may raise if network unreachable; catch broadly
+                self.client = boto3.client(**kwargs)
+            except Exception:
+                self.client = None
+        else:
             self.client = None
         # We'll optimistically assume MinIO is not in use until a call succeeds
         self._use_minio = False
