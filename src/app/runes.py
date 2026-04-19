@@ -16,22 +16,64 @@ def _data_file_path() -> str:
 class RuneManager:
     def __init__(self):
         self._file = _data_file_path()
+        self._items = []
         self._load()
 
     def _load(self):
         try:
-            with open(self._file, "r", encoding="utf-8") as fh:
-                self._items = json.load(fh)
+            # Use advisory file lock on POSIX to avoid concurrent readers/writers
+            import fcntl
+
+            with open(self._file, "a+", encoding="utf-8") as fh:
+                fh.seek(0)
+                try:
+                    fcntl.flock(fh, fcntl.LOCK_SH)
+                    content = fh.read()
+                    if content:
+                        self._items = json.loads(content)
+                    else:
+                        self._items = []
+                finally:
+                    try:
+                        fcntl.flock(fh, fcntl.LOCK_UN)
+                    except Exception:
+                        pass
+        except FileNotFoundError:
+            self._items = []
         except Exception:
+            # Fallback to empty if anything goes wrong during load
             self._items = []
 
     def _save(self):
         tmp = f"{self._file}.tmp"
+        # Write to temp file then atomically replace the main file. Also
+        # use an exclusive lock on the target file while replacing it.
         with open(tmp, "w", encoding="utf-8") as fh:
             json.dump(self._items, fh, ensure_ascii=False, indent=2)
             fh.flush()
-            os.fsync(fh.fileno())
-        os.replace(tmp, self._file)
+            try:
+                os.fsync(fh.fileno())
+            except Exception:
+                pass
+
+        # Ensure the replace is done while holding lock on the target file
+        try:
+            import fcntl
+
+            # Open (or create) target file and lock it while replacing
+            with open(self._file, "a+", encoding="utf-8") as target_fh:
+                try:
+                    fcntl.flock(target_fh, fcntl.LOCK_EX)
+                    os.replace(tmp, self._file)
+                finally:
+                    try:
+                        fcntl.flock(target_fh, fcntl.LOCK_UN)
+                    except Exception:
+                        pass
+        except Exception:
+            # If fcntl not available (e.g., Windows) or locking fails,
+            # fallback to atomic replace without explicit lock.
+            os.replace(tmp, self._file)
 
     def list(self) -> List[dict]:
         return list(self._items)
