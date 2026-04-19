@@ -1,19 +1,26 @@
-from gitara.llm_provider import get_provider
+from gitara.backends.llm_provider import LlamaCppProvider
 
 
-def test_stub_provider_generates_from_added_line():
-    p = get_provider()
-    diff = """
-diff --git a/foo b/foo
-index 000000..111111 100644
---- a/foo
-+++ b/foo
-+Added feature X that improves performance
-"""
-    msg = p.generate_commit_message(diff)
-    assert msg.startswith("feat:") or msg.startswith("chore:"), "unexpected commit message format"
+def test_llama_cpp_provider_from_diff():
+    prov = LlamaCppProvider()
+    diff = (
+        "diff --git a/README.md b/README.md\n"
+        "index 123..456\n"
+        "--- a/README.md\n"
+        "+++ b/README.md\n"
+        "@@ -1 +1,2 @@\n"
+        "-Hello\n"
+        "+Hello\n"
+        "+World\n"
+    )
+    msg = prov.generate_commit_message(diff)
+    assert isinstance(msg, str)
+    assert msg == "chore: update README.md"
 
 
-def test_stub_empty_diff():
-    p = get_provider()
-    assert p.generate_commit_message("") == "chore: empty diff"
+def test_llama_cpp_provider_fallback():
+    prov = LlamaCppProvider()
+    diff = "+ Added a small change\n- removed old\n"
+    msg = prov.generate_commit_message(diff)
+    assert isinstance(msg, str)
+    assert msg.startswith("chore: update")

@@ -1,3 +1,3 @@
-"""Gitara package: LLM provider abstractions and adapters."""
+"""Gitara package root."""
 
-__all__ = ["llm_provider"]
+__all__ = ["backends"]
