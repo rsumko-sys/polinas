@@ -1,2 +1,31 @@
 # Google App Engine generated folder
 appengine-generated/
+
+# Ignore common non-code artifacts that can poison ML datasets
+*.html
+*.htm
+*.svg
+*.geojson
+*.shp
+*.gpx
+
+# Model weight files (do not commit large model artifacts)
+*.gguf
+*.safetensors
+*.pt
+*.pth
+*.bin
+*.ckpt
+*.bin.index
+
+# Archive directory for extracted non-repo artifacts
+/archives/
+
+# Virtual environments
+.venv/
+.venv311/
+.venv*/
+
+# Environment files
+.env
+.env.*
