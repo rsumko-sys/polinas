@@ -11,6 +11,8 @@ import HorseProfile from './HorseProfile';
 import SensorTracker from './SensorTracker';
 import { useTranslation } from '../i18n';
 
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 const RUNES = [
   { id: 'route', titleKey: 'route.title', icon: 'R' },
   { id: 'weather', titleKey: 'weather.title', icon: 'S' },
@@ -176,7 +178,7 @@ const Dashboard: React.FC = () => {
                              setIsOracleLoading(true);
                              setOracleResponse('');
                              try {
-                               const res = await fetch('http://localhost:8000/oracle/ask', {
+                               const res = await fetch(`${BASE_URL}/oracle/ask`, {
                                  method: 'POST',
                                  headers: { 
                                    'Content-Type': 'application/json',

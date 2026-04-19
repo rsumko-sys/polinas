@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Polinas Diaries</string>
+    <string name="title_activity_main">Polinas Diaries</string>
+    <string name="package_name">com.polinas.diaries</string>
+    <string name="custom_url_scheme">com.polinas.diaries</string>
+</resources>
