@@ -115,43 +115,32 @@ if os.path.isdir(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 
+def _render_static(filename: str, default_html: str) -> HTMLResponse:
+    path = os.path.join(static_dir, filename)
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(default_html)
+
+
 @app.get("/")
 def ui_index() -> HTMLResponse:
-    index_path = os.path.join(static_dir, "index.html")
-    if os.path.exists(index_path):
-        with open(index_path, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    return HTMLResponse("<html><body><h1>Polina's Diaries</h1></body></html>")
-
+    return _render_static("index.html", "<html><body><h1>Polina's Diaries</h1></body></html>")
 
 
 @app.get('/ui/dashboard')
 def ui_dashboard() -> HTMLResponse:
-    path = os.path.join(static_dir, 'ui_dashboard.html')
-    if os.path.exists(path):
-        with open(path, 'r', encoding='utf-8') as f:
-            return HTMLResponse(content=f.read())
-    return HTMLResponse('<html><body><h1>Dashboard</h1></body></html>')
+    return _render_static('ui_dashboard.html', '<html><body><h1>Dashboard</h1></body></html>')
 
 
-# Serve stub sessions page
 @app.get('/ui/sessions')
 def ui_sessions() -> HTMLResponse:
-    path = os.path.join(static_dir, 'ui_sessions.html')
-    if os.path.exists(path):
-        with open(path, 'r', encoding='utf-8') as f:
-            return HTMLResponse(content=f.read())
-    return HTMLResponse('<html><body><h1>Sessions (stub)</h1></body></html>')
+    return _render_static('ui_sessions.html', '<html><body><h1>Sessions (stub)</h1></body></html>')
 
-# Serve stub training plans page
+
 @app.get('/ui/trainingplans')
 def ui_trainingplans() -> HTMLResponse:
-    path = os.path.join(static_dir, 'ui_trainingplans.html')
-    if os.path.exists(path):
-        with open(path, 'r', encoding='utf-8') as f:
-            return HTMLResponse(content=f.read())
-    return HTMLResponse('<html><body><h1>Training Plans (stub)</h1></body></html>')
-
+    return _render_static('ui_trainingplans.html', '<html><body><h1>Training Plans (stub)</h1></body></html>')
 
 class SecretIn(BaseModel):
     key: str
