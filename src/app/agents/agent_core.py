@@ -4,6 +4,12 @@ import time
 import logging
 from typing import Callable, Any, List, Dict, Optional, Tuple
 from copy import deepcopy
+import traceback
+
+try:
+    from app.agents.invariants import InvariantStore  # type: ignore
+except Exception:
+    InvariantStore = None
 
 try:
     from app.agents.guardrails import Guardrails  # type: ignore
@@ -45,21 +51,24 @@ class Agent:
     def _record(self, role: str, output: Any) -> None:
         self.trace.append({"timestamp": time.time(), "role": role, "output": deepcopy(output)})
 
-    def run(self, prompt: str) -> Dict[str, Any]:
+    def run(self, prompt: str, invariants: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Run the agent with a `generate -> verify` loop.
 
         Returns a dict containing at least: `result`, `ok`, `confidence`, `trace`.
         """
         confidences: List[float] = []
         last_generated: Any = None
+        invariant_store = InvariantStore(invariants) if (InvariantStore is not None and invariants) else None
 
         for i in range(1, max(1, int(self.max_iterations)) + 1):
             # Generation (stimulation)
             try:
                 gen_out = self.generator(prompt)
-            except Exception as e:
-                self.log.exception("generator failed")
-                gen_out = {"error": f"generator_exception: {e}"}
+            except Exception:
+                stack = traceback.format_exc()
+                # record minimal generate exception trace and return safe error payload
+                self._record("generate_exception", stack)
+                return {"ok": False, "error_stack": stack, "invariants": invariants or {}, "trace": list(self.trace)}
 
             # Guardrails sanitize output before verification
             if self.guardrails is not None:
@@ -71,12 +80,24 @@ class Agent:
             self._record("generate", gen_out)
             last_generated = deepcopy(gen_out)
 
+            # Invariant check: fail fast if generated output modifies protected invariants
+            if invariant_store is not None:
+                ok_inv, mismatches = invariant_store.check(gen_out)
+                if not ok_inv:
+                    msg = f"invariant_violation: modified keys {mismatches}"
+                    confidences.append(0.0)
+                    self._record("verify", {"ok": False, "message": msg, "confidence": 0.0})
+                    # continue to next iteration to allow retry
+                    continue
+
             # Verification
             try:
                 ok, info = self.verifier(gen_out)
-            except Exception as e:
-                ok = False
-                info = f"verifier_exception: {e}"
+            except Exception:
+                stack = traceback.format_exc()
+                self._record("verify_exception", stack)
+                # For verifier exceptions we return a minimal payload (only stack + invariants)
+                return {"ok": False, "error_stack": stack, "invariants": invariants or {}, "trace": list(self.trace)}
 
             # Interpret verifier info: support (confidence, message) or simple message
             if isinstance(info, tuple) and isinstance(info[0], (int, float)):
@@ -88,6 +109,18 @@ class Agent:
 
             confidences.append(conf)
             self._record("verify", {"ok": ok, "message": message, "confidence": conf})
+
+            # If verifier reports ok, double-check invariants still hold (defense-in-depth)
+            if ok and invariant_store is not None:
+                ok_inv, mismatches = invariant_store.check(gen_out)
+                if not ok_inv:
+                    ok = False
+                    message = f"invariant_violation_after_verify: modified keys {mismatches}"
+                    # record the change
+                    confidences.append(0.0)
+                    self._record("verify", {"ok": False, "message": message, "confidence": 0.0})
+                    # continue loop
+                    continue
 
             if ok:
                 # Idempotence guard: if same as last successful result, short-circuit
