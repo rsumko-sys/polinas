@@ -1,3 +1,12 @@
+pytest
+httpx
+pytest-asyncio
+pytest-cov
+ruff
+mypy
+black
+isort
+anyio
 pre-commit>=3.4
 detect-secrets>=1.6.1
 ruff>=0.1.270
