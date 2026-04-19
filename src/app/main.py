@@ -1,5 +1,12 @@
-from fastapi import FastAPI, Depends
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, UploadFile, File, Form, Depends
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi import Request, HTTPException
+from pydantic import BaseModel
+from fastapi.staticfiles import StaticFiles
+from datetime import datetime
+import tempfile
+import os
+import uuid
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -7,34 +14,26 @@ from slowapi.errors import RateLimitExceeded
 
 from .security import require_api_key, get_admin_api_key
 
+from app.data.kharkiv_clubs import CLUBS_DATA, generate_club_map
+from app.models import SessionData, Rune
+from app.ingest_gpx import parse_gpx
+from app.ingest_video import get_video_metadata
+from app.storage.s3_storage import S3Storage
+from app.notion_client import NotionClient
+from app.config import NOTION_TOKEN, NOTION_SESSIONS_DB_ID
+from app.ai_chain import generate_chain
+from app.pid_tuner import PIDController
+from app.osint_pipeline import OSINTPipeline
+from app.runes import get_rune_manager
+from app import secrets as secrets_helper
 
-app = FastAPI(title="POLINAS Diaries API")
+
+app = FastAPI(title="Horse Training Intelligence Platform")
 
 # Rate limiter middleware
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-
-@app.get("/health")
-async def health():
-    return JSONResponse({"status": "ok"})
-
-
-@app.get("/admin/secrets")
-@limiter.limit("10/minute")
-async def admin_secrets(api_key: str = Depends(require_api_key)):
-    """Admin-only endpoint — returns non-sensitive status about secrets configuration."""
-    # Never return actual secret values — only presence/health info
-    return {
-        "admin_key_configured": bool(get_admin_api_key()),
-        "note": "Secrets are redacted. Use environment variables for ADMIN_API_KEY.",
-    }
-
-
-@app.get("/")
-async def index():
-    return JSONResponse({"msg": "POLINAS Diaries API — see /docs"})
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi import Request, HTTPException
@@ -172,22 +171,24 @@ def _check_admin(request: Request):
 
 
 @app.get('/admin/secrets')
-def list_secrets(request: Request):
-    _check_admin(request)
+def list_secrets(api_key: str = Depends(require_api_key)):
+    """List masked environment secrets (admin-only).
+
+    Uses the API key dependency for protection. The helper returns masked
+    values and this endpoint will never reveal raw secret material.
+    """
     return secrets_helper.list_env_masked()
 
 
 @app.post('/admin/secrets')
-def set_secret(s: SecretIn, request: Request):
-    _check_admin(request)
+def set_secret(s: SecretIn, api_key: str = Depends(require_api_key)):
     # write to project .env only; do NOT expose values to frontend
     secrets_helper.set_env_var(s.key, s.value)
     return {'status': 'ok', 'key': s.key}
 
 
 @app.delete('/admin/secrets/{key}')
-def delete_secret(key: str, request: Request):
-    _check_admin(request)
+def delete_secret(key: str, api_key: str = Depends(require_api_key)):
     secrets_helper.delete_env_var(key)
     return {'status': 'deleted', 'key': key}
 
