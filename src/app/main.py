@@ -7,7 +7,7 @@ from datetime import datetime
 import math
 from typing import Any, Dict, List, Optional, Mapping, cast, Callable
 
-from fastapi import FastAPI, UploadFile, File, Form, Depends, Request, HTTPException, Query, Header
+from fastapi import FastAPI, UploadFile, File, Form, Depends, Request, HTTPException, Query, Header, BackgroundTasks
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -268,6 +268,7 @@ def apply_rune(rune_id: str, target_type: str = Form(...), target_id: Optional[s
 
 @app.post("/ingest/session")
 async def ingest_session(
+    background_tasks: BackgroundTasks,
     title: str = Form(...),
     date: str = Form(...),
     horse: str = Form(...),
@@ -321,10 +322,39 @@ async def ingest_session(
         gpx_url=gpx_url,
     )
 
-    session_id = notion.create_session(session, video_url, gpx_url)
-
     session_dict = session.dict()
     session_dict["date"] = session.date.isoformat()
+
+    def _persist_to_notion(sync_session_dict: dict, video_u: Optional[str], gpx_u: Optional[str]) -> None:
+        try:
+            generate_chain_any = cast(Any, _generate_chain)
+            issue, drill, plan = generate_chain_any(sync_session_dict)
+
+            created_session_id = notion.create_session(sync_session_dict, video_u, gpx_u)
+            issue.session_id = created_session_id
+            issue_id = notion.create_issue(issue)
+            drill_id = notion.create_drill(drill, issue_id)
+            plan.focus_issue = issue.name
+            plan.drills = [drill_id]
+            notion.create_plan(plan, issue_id, [drill_id])
+
+            error_stats = {"noise_variance": 0.5, "bias_trend": 0.2, "anticipation": 0.3}
+            try:
+                pid.tune(error_stats)
+            except Exception:
+                pass
+        except Exception:
+            # swallow errors - background persistence must not crash the app
+            return
+
+    async_ingest = os.getenv("ASYNC_INGEST", "true").lower() in ("1", "true", "yes")
+    if async_ingest:
+        session_id_local = str(uuid.uuid4())
+        background_tasks.add_task(_persist_to_notion, session_dict, video_url, gpx_url)
+        return JSONResponse(content={"session_id": session_id_local, "queued": True})
+
+    # Legacy synchronous path (preserve existing API semantics)
+    session_id = notion.create_session(session, video_url, gpx_url)
 
     # generate_chain is untyped; call via Any to avoid mypy no-untyped-call
     generate_chain_any = cast(Any, _generate_chain)

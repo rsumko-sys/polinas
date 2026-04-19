@@ -93,11 +93,31 @@ class OSINTPipeline:
             return
         try:
             with self.neo4j_driver.session() as session:
-                session.run("MATCH (n) DETACH DELETE n")
+                tx = session.begin_transaction()
+                # Clear existing graph
+                tx.run("MATCH (n) DETACH DELETE n")
+
+                # Batch create/merge nodes
+                nodes_batch = []
                 for node, data in self.graph.nodes(data=True):
-                    session.run("CREATE (n:Entity {name: $name, type: $type})", name=node, type=data.get("type", "unknown"))
+                    nodes_batch.append({"name": node, "type": data.get("type", "unknown")})
+                if nodes_batch:
+                    tx.run(
+                        "UNWIND $nodes AS n MERGE (e:Entity {name: n.name}) SET e.type = n.type",
+                        nodes=nodes_batch,
+                    )
+
+                # Batch create relationships
+                rels_batch = []
                 for u, v, data in self.graph.edges(data=True):
-                    session.run("MATCH (a:Entity {name: $u}), (b:Entity {name: $v}) CREATE (a)-[:RELATES]->(b)", u=u, v=v)
+                    rels_batch.append({"u": u, "v": v})
+                if rels_batch:
+                    tx.run(
+                        "UNWIND $rels AS r MATCH (a:Entity {name: r.u}), (b:Entity {name: r.v}) MERGE (a)-[:RELATES]->(b)",
+                        rels=rels_batch,
+                    )
+
+                tx.commit()
         except Exception:
             # If Neo4j is unreachable or operation fails, do not propagate to caller.
             return

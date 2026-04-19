@@ -1,4 +1,6 @@
 from typing import Any, Optional
+from typing import List, Tuple
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 class IntegrationsFacade:
@@ -26,6 +28,24 @@ class IntegrationsFacade:
         if self.storage:
             return self.storage.upload_file(path, key)
         raise RuntimeError('No storage available')
+
+    def upload_files(self, pairs: List[Tuple[str, str]], max_workers: int = 4) -> List[str]:
+        """Upload multiple files in parallel using a thread pool.
+
+        Accepts a list of `(path, key)` tuples and returns a list of resulting URLs/keys
+        in the same order. This reduces wall-clock time when uploading several files
+        to a network-backed storage (mitigates chatty per-file sequential uploads).
+        """
+        if not self.storage:
+            raise RuntimeError('No storage available')
+
+        results: List[str] = [""] * len(pairs)
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
+            future_to_idx = {ex.submit(self.storage.upload_file, p, k): i for i, (p, k) in enumerate(pairs)}
+            for future in as_completed(future_to_idx):
+                idx = future_to_idx[future]
+                results[idx] = future.result()
+        return results
 
     def generate_presigned(self, key: str, expires: int = 3600) -> str:
         if self.storage:
