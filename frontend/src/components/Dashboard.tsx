@@ -280,12 +280,17 @@ const Dashboard: React.FC = () => {
               <button 
                 onClick={() => setActiveRune(null)}
                 style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--text-secondary)',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#fff',
                   fontFamily: 'var(--cinzel-font)',
                   cursor: 'pointer',
-                  textDecoration: 'underline'
+                  padding: '0.8rem 2rem',
+                  borderRadius: '30px',
+                  fontSize: '1rem',
+                  letterSpacing: '2px',
+                  textTransform: 'uppercase',
+                  boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
                 }}
               >
                 {t('dashboard.back')}
