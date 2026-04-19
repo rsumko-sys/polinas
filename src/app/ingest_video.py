@@ -1,6 +1,3 @@
-def get_video_metadata(path: str):
-    # Dev stub: return a minimal metadata dict
-    return {"duration": 0, "codec": None}
 from moviepy.editor import VideoFileClip
 from app.models import VideoMetadata
 

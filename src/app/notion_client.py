@@ -1,21 +1,10 @@
-import uuid
+from typing import Any, List, Optional
 
+try:
+    from notion_client import Client
+except Exception:
+    Client = None
 
-class NotionClient:
-    """Minimal NotionClient shim that returns fake IDs for local QA."""
-
-    def create_session(self, session, video_url=None, gpx_url=None):
-        return str(uuid.uuid4())
-
-    def create_issue(self, issue):
-        return str(uuid.uuid4())
-
-    def create_drill(self, drill, issue_id):
-        return str(uuid.uuid4())
-
-    def create_plan(self, plan, issue_id, drill_ids):
-        return str(uuid.uuid4())
-from notion_client import Client
 from app.config import (
     NOTION_TOKEN,
     NOTION_SESSIONS_DB_ID,
@@ -28,20 +17,20 @@ from app.models import SessionData, Issue, Drill, TrainingPlan
 
 
 class NotionClient:
-    def __init__(self):
-        self.client = Client(auth=NOTION_TOKEN)
-        self.sessions_db = NOTION_SESSIONS_DB_ID
-        self.issues_db = NOTION_ISSUES_DB_ID
-        self.drills_db = NOTION_DRILLS_DB_ID
-        self.analysis_db = NOTION_ANALYSIS_DB_ID
-        self.plan_db = NOTION_PLAN_DB_ID
+    def __init__(self) -> None:
+        self.client: Any = Client(auth=NOTION_TOKEN) if Client else None
+        self.sessions_db: Optional[str] = NOTION_SESSIONS_DB_ID
+        self.issues_db: Optional[str] = NOTION_ISSUES_DB_ID
+        self.drills_db: Optional[str] = NOTION_DRILLS_DB_ID
+        self.analysis_db: Optional[str] = NOTION_ANALYSIS_DB_ID
+        self.plan_db: Optional[str] = NOTION_PLAN_DB_ID
 
-    def create_session(self, session: SessionData, video_url=None, gpx_url=None) -> str:
+    def create_session(self, session: SessionData, video_url: Any = None, gpx_url: Any = None) -> str:
         props = {
             "Session Name": {"title": [{"text": {"content": session.title}}]},
             "Date": {"date": {"start": session.date.isoformat()}},
             "Horse": {"select": {"name": session.horse}},
-            "Type": {"select": {"name": session.type}},
+            "Type": {"select": {"name": session.session_type}},
             "Duration_min": {"number": session.duration_min},
             "Distance_km": {"number": session.distance_km},
             "Avg_speed": {"number": session.avg_speed},
@@ -62,7 +51,7 @@ class NotionClient:
                 "files": [{"name": "track", "type": "external", "external": {"url": gpx_url}}]
             }
         page = self.client.pages.create(parent={"database_id": self.sessions_db}, properties=props)
-        return page["id"]
+        return str(page.get("id"))
 
     def create_issue(self, issue: Issue) -> str:
         props = {
@@ -77,7 +66,7 @@ class NotionClient:
         if issue.session_id:
             props["Detected_in"] = {"relation": [{"id": issue.session_id}]}
         page = self.client.pages.create(parent={"database_id": self.issues_db}, properties=props)
-        return page["id"]
+        return str(page.get("id"))
 
     def create_drill(self, drill: Drill, issue_id: str) -> str:
         props = {
@@ -90,9 +79,9 @@ class NotionClient:
             "Linked Issue": {"relation": [{"id": issue_id}]},
         }
         page = self.client.pages.create(parent={"database_id": self.drills_db}, properties=props)
-        return page["id"]
+        return str(page.get("id"))
 
-    def create_plan(self, plan: TrainingPlan, issue_id: str, drill_ids: list) -> str:
+    def create_plan(self, plan: TrainingPlan, issue_id: str, drill_ids: List[str]) -> str:
         props = {
             "Title": {"title": [{"text": {"content": plan.title}}]},
             "Date": {"date": {"start": plan.date.isoformat()}},
@@ -104,4 +93,4 @@ class NotionClient:
             "Completed": {"checkbox": plan.completed},
         }
         page = self.client.pages.create(parent={"database_id": self.plan_db}, properties=props)
-        return page["id"]
+        return str(page.get("id"))

@@ -1,6 +1,7 @@
 import os
+from typing import List, Dict, Any
 
-CLUBS_DATA = []
+CLUBS_DATA: List[Dict[str, Any]] = []
 
 def generate_club_map(output_path: str) -> str:
     """Create a minimal HTML file representing the clubs map.

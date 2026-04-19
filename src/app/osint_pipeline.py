@@ -1,33 +1,24 @@
-class OSINTPipeline:
-    def __init__(self):
-        pass
-
-    def run(self):
-        # Return empty result set for local QA
-        return []
 import re
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 import networkx as nx
 from neo4j import GraphDatabase
 from app.config import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
 
 
 class OSINTPipeline:
-    def __init__(self):
-        self.graph = nx.Graph()
-        self.neo4j_driver = None
+    def __init__(self) -> None:
+        self.graph: nx.Graph = nx.Graph()
+        self.neo4j_driver: Optional[Any] = None
         # Create Neo4j driver only if URI is configured; otherwise operate in-memory
         if NEO4J_URI:
-            # Avoid trying to connect to typical Docker hostnames in local dev
-            # when they are unlikely to resolve (e.g., 'neo4j', 'db'). Attempt
-            # a DNS resolution check first and skip driver creation if it fails.
             try:
                 host = NEO4J_URI.split('://')[-1].split(':')[0]
             except Exception:
                 host = None
             should_try = True
             if host and (host == 'neo4j' or host == 'db' or host.endswith('.local')):
-                # perform a quick DNS probe
                 try:
                     import socket
 
@@ -42,15 +33,15 @@ class OSINTPipeline:
                     # driver unavailable (e.g., host unresolved) — continue without raising
                     self.neo4j_driver = None
 
-    def fetch_news(self, query="horse riding Kharkiv"):
+    def fetch_news(self, query: str = "horse riding Kharkiv") -> List[Dict[str, str]]:
         return [{"title": "Example news", "content": "Event in Kharkiv horse club", "date": datetime.now().isoformat()}]
 
-    def extract_entities(self, text):
+    def extract_entities(self, text: str) -> Dict[str, List[str]]:
         persons = re.findall(r"\b(?:Mr\.|Ms\.|Dr\.)?\s?([A-Z][a-z]+ [A-Z][a-z]+)\b", text)
         locations = re.findall(r"\b(?:Kharkiv|Kharkov|Bezlyudivka|Lisopark)\b", text)
         return {"persons": persons, "locations": locations}
 
-    def build_graph(self, entities):
+    def build_graph(self, entities: Dict[str, List[str]]) -> None:
         for person in entities["persons"]:
             self.graph.add_node(person, type="person")
         for loc in entities["locations"]:
@@ -58,7 +49,7 @@ class OSINTPipeline:
             for person in entities["persons"]:
                 self.graph.add_edge(person, loc, relation="visited")
 
-    def sync_to_neo4j(self):
+    def sync_to_neo4j(self) -> None:
         if not self.neo4j_driver:
             # No driver configured — skip sync silently
             return
@@ -73,10 +64,10 @@ class OSINTPipeline:
             # If Neo4j is unreachable or operation fails, do not propagate to caller.
             return
 
-    def score_case(self, case_entities, connectivity=1.0, impact=0.5, confidence=0.8):
+    def score_case(self, case_entities: Dict[str, Any], connectivity: float = 1.0, impact: float = 0.5, confidence: float = 0.8) -> float:
         return impact * confidence * connectivity
 
-    def run(self):
+    def run(self) -> List[Dict[str, Any]]:
         news_items = self.fetch_news()
         for item in news_items:
             entities = self.extract_entities(item["title"] + " " + item["content"])

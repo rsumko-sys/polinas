@@ -1,43 +1,19 @@
 import os
-from typing import Dict
-
-
-def list_env_masked() -> Dict[str, str]:
-    keys = [
-        "ADMIN_API_KEY",
-        "NOTION_TOKEN",
-        "OPENAI_API_KEY",
-        "MINIO_SECRET_KEY",
-        "NEO4J_PASSWORD",
-    ]
-    out = {}
-    for k in keys:
-        v = os.environ.get(k)
-        out[k] = "SET" if v else "UNSET"
-    return out
-
-
-def set_env_var(key: str, value: str) -> None:
-    # For local dev we set in-process env only. Production should use a secrets store.
-    os.environ[key] = value
-
-
-def delete_env_var(key: str) -> None:
-    os.environ.pop(key, None)
+from typing import Dict, List
 import os
 from typing import Dict
 
 ENV_PATH = os.path.join(os.getcwd(), '.env')
 
 
-def _read_lines(path: str = ENV_PATH):
+def _read_lines(path: str = ENV_PATH) -> List[str]:
     if not os.path.exists(path):
         return []
     with open(path, 'r', encoding='utf-8') as f:
         return f.readlines()
 
 
-def _write_lines(lines, path: str = ENV_PATH):
+def _write_lines(lines: List[str], path: str = ENV_PATH) -> None:
     with open(path, 'w', encoding='utf-8') as f:
         f.writelines(lines)
 
@@ -54,7 +30,7 @@ def list_env(path: str = ENV_PATH) -> Dict[str, str]:
     return res
 
 
-def set_env_var(key: str, value: str, path: str = ENV_PATH):
+def set_env_var(key: str, value: str, path: str = ENV_PATH) -> None:
     """Set or update an env var in the env file. Creates the file if missing."""
     lines = _read_lines(path)
     key_line = f"{key}={value}\n"
@@ -71,7 +47,7 @@ def set_env_var(key: str, value: str, path: str = ENV_PATH):
     _write_lines(out, path)
 
 
-def delete_env_var(key: str, path: str = ENV_PATH):
+def delete_env_var(key: str, path: str = ENV_PATH) -> None:
     lines = _read_lines(path)
     out = [l for l in lines if not l.strip().startswith(f"{key}=")]
     _write_lines(out, path)

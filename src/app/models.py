@@ -1,33 +1,9 @@
-from pydantic import BaseModel
-from typing import Optional
+from __future__ import annotations
+
 from datetime import datetime
+from typing import Optional, List, Dict
 
-
-class SessionData(BaseModel):
-    title: str
-    date: datetime
-    horse: str
-    type: str
-    duration_min: float
-    distance_km: float
-    avg_speed: float
-    max_speed: float
-    feeling: str
-    energy_horse: str
-    surface: str
-    weather: str
-    notes_raw: str
-    video_url: Optional[str] = None
-    gpx_url: Optional[str] = None
-
-
-class Rune(BaseModel):
-    id: Optional[str]
-    name: str
-    effect: Optional[str] = None
 from pydantic import BaseModel
-from datetime import datetime
-from typing import Optional, List
 
 
 class GPXMetadata(BaseModel):
@@ -35,8 +11,8 @@ class GPXMetadata(BaseModel):
     duration_s: float
     avg_speed_kmh: float
     max_speed_kmh: float
-    start_time: Optional[str]
-    end_time: Optional[str]
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
 
 
 class VideoMetadata(BaseModel):
@@ -49,7 +25,7 @@ class SessionData(BaseModel):
     title: str
     date: datetime
     horse: str
-    type: str
+    session_type: str
     duration_min: float
     distance_km: float
     avg_speed: float
@@ -106,14 +82,14 @@ class OSINTCase(BaseModel):
 
 
 class Rune(BaseModel):
-    id: Optional[str]
+    id: Optional[str] = None
     name: str
-    sigil: str
-    category: Optional[str]
-    description: Optional[str]
-    effects: Optional[dict] = {}
-    triggers: Optional[List[str]] = []
-    mapped_targets: Optional[List[dict]] = []
+    sigil: Optional[str] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
+    effects: Optional[Dict[str, object]] = None
+    triggers: Optional[List[str]] = None
+    mapped_targets: Optional[List[Dict[str, object]]] = None
     # spiritual/UX fields for non-linear behavior
     spiritual_effect: Optional[str] = None
     ui_hint: Optional[str] = None

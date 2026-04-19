@@ -1,29 +1,17 @@
 import os
-
-
-class S3Storage:
-    """Minimal S3Storage shim for local development.
-
-    The implementation uses a simple local path URL return so callers can
-    proceed without a real MinIO/S3 service.
-    """
-
-    def upload_file(self, local_path: str, key: str) -> str:
-        # In dev return a file:// URL to the uploaded path
-        if not os.path.exists(local_path):
-            return ""
-        return f"file://{os.path.abspath(local_path)}"
-import os
 import shutil
 import boto3
+from typing import Any
+
 try:
     from botocore.client import Config
     from botocore.exceptions import EndpointConnectionError
 except Exception:
     # botocore may not be installed in lightweight developer environments;
     # provide fallbacks so import-time does not fail.
-    class EndpointConnectionError(Exception):
+    class _EndpointConnectionError(Exception):
         pass
+    EndpointConnectionError = _EndpointConnectionError
     Config = None
 from app.config import MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_BUCKET
 
@@ -33,10 +21,11 @@ class S3Storage:
     back to a local filesystem storage. Initialization is non-fatal so the
     application can start in developer environments without MinIO.
     """
-    def __init__(self):
-        self.bucket = MINIO_BUCKET
-        self.endpoint = MINIO_ENDPOINT
-        self._use_minio = False
+    def __init__(self) -> None:
+        self.bucket: str = MINIO_BUCKET
+        self.endpoint: str = MINIO_ENDPOINT
+        self._use_minio: bool = False
+        self.client: Any = None
         # Defer network calls until an upload is attempted to avoid long
         # import-time delays when MinIO is not available in the environment.
         try:
@@ -57,7 +46,7 @@ class S3Storage:
         self._use_minio = False
 
         # Local fallback directory
-        self._local_dir = os.path.join(os.getcwd(), 'data', 'local_storage')
+        self._local_dir: str = os.path.join(os.getcwd(), 'data', 'local_storage')
         os.makedirs(self._local_dir, exist_ok=True)
 
     def upload_file(self, local_path: str, object_name: str) -> str:
@@ -88,14 +77,14 @@ class S3Storage:
         shutil.copy2(local_path, dest)
         return f"file://{dest}"
 
-    def generate_presigned_url(self, object_name: str, expires=3600) -> str:
+    def generate_presigned_url(self, object_name: str, expires: int = 3600) -> str:
         if self._use_minio:
             try:
-                return self.client.generate_presigned_url(
+                return str(self.client.generate_presigned_url(
                     'get_object',
                     Params={'Bucket': self.bucket, 'Key': object_name},
                     ExpiresIn=expires
-                )
+                ))
             except Exception:
                 pass
         # For local fallback return a file URL if exists

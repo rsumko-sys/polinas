@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import os
 import json
 import uuid
-from typing import List
+from typing import List, Dict, Optional, Mapping
 
-_MANAGER = None
+_MANAGER: Optional["RuneManager"] = None
 
 
 def _data_file_path() -> str:
@@ -14,12 +16,12 @@ def _data_file_path() -> str:
 
 
 class RuneManager:
-    def __init__(self):
-        self._file = _data_file_path()
-        self._items = []
+    def __init__(self) -> None:
+        self._file: str = _data_file_path()
+        self._items: List[Dict[str, object]] = []
         self._load()
 
-    def _load(self):
+    def _load(self) -> None:
         try:
             # Use advisory file lock on POSIX to avoid concurrent readers/writers
             import fcntl
@@ -44,7 +46,7 @@ class RuneManager:
             # Fallback to empty if anything goes wrong during load
             self._items = []
 
-    def _save(self):
+    def _save(self) -> None:
         tmp = f"{self._file}.tmp"
         # Write to temp file then atomically replace the main file. Also
         # use an exclusive lock on the target file while replacing it.
@@ -75,17 +77,17 @@ class RuneManager:
             # fallback to atomic replace without explicit lock.
             os.replace(tmp, self._file)
 
-    def list(self) -> List[dict]:
+    def list(self) -> List[Dict[str, object]]:
         return list(self._items)
 
-    def create(self, data: dict) -> dict:
-        item = dict(data)
+    def create(self, data: Dict[str, object]) -> Dict[str, object]:
+        item: Dict[str, object] = dict(data)
         item.setdefault("id", str(uuid.uuid4()))
         self._items.append(item)
         self._save()
         return item
 
-    def apply(self, rune_id: str, target: dict) -> dict:
+    def apply(self, rune_id: str, target: Mapping[str, object]) -> Dict[str, object]:
         for r in self._items:
             if r.get("id") == rune_id:
                 # For dev: return combined dict
@@ -93,7 +95,7 @@ class RuneManager:
         raise KeyError("rune not found")
 
 
-def get_rune_manager():
+def get_rune_manager() -> "RuneManager":
     global _MANAGER
     if _MANAGER is None:
         _MANAGER = RuneManager()

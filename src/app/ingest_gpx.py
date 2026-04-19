@@ -1,6 +1,3 @@
-def parse_gpx(path: str):
-    # Dev stub: parse is a no-op for smoke checks
-    return None
 import gpxpy
 from app.models import GPXMetadata
 
