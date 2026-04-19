@@ -19,6 +19,7 @@ from slowapi.errors import RateLimitExceeded
 from .security import require_api_key
 
 from app.data.kharkiv_clubs import CLUBS_DATA, generate_club_map
+from app.services.clubs_service import ClubsService
 from app.models import SessionData, Rune
 from app.notion_client import NotionClient
 from app.config import NOTION_TOKEN, NOTION_SESSIONS_DB_ID
@@ -198,33 +199,14 @@ def clubs_nearest(
     lon: float = Query(..., description="Longitude of the user"),
     limit: int = Query(1, ge=1, le=50, description="Maximum number of results to return"),
 ) -> Dict[str, Any]:
-    """Return nearest horse clubs to the given coordinates using the Haversine formula.
+    """Controller: delegate to ClubsService (separates HTTP handling from business rules).
+
+    GRASP: Controller - `app.main` acts as a thin controller and delegates responsibilities
+    to domain/service objects. ClubsService is the Information Expert for club data.
     """
-    def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-        R = 6371.0  # Earth radius in kilometers
-        phi1 = math.radians(lat1)
-        phi2 = math.radians(lat2)
-        dphi = math.radians(lat2 - lat1)
-        dlambda = math.radians(lon2 - lon1)
-        a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-        return R * (2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
-
-    found: List[Dict[str, object]] = []
-    for club in CLUBS_DATA:
-        lat2 = club.get("latitude")
-        lon2 = club.get("longitude")
-        if lat2 is None or lon2 is None:
-            continue
-        try:
-            dist = haversine(float(lat), float(lon), float(lat2), float(lon2))
-        except Exception:
-            continue
-        entry = dict(club)
-        entry["distance_km"] = dist
-        found.append(entry)
-
-    found.sort(key=lambda x: x.get("distance_km", float("inf")))
-    return {"clubs": found[:limit]}
+    svc = ClubsService()
+    result = svc.nearest(lat=lat, lon=lon, limit=limit)
+    return {"clubs": result}
 
 
 @app.post("/clubs/map")
