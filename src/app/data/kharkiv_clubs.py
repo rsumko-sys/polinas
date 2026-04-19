@@ -179,7 +179,7 @@ def generate_club_map(output_path: str) -> str:
 
         clubs_json = json.dumps(clubs_with_coords)
 
-        html = f"""<!doctype html>
+        html_template = """<!doctype html>
 <html>
 <head>
     <meta charset='utf-8'>
@@ -197,9 +197,9 @@ def generate_club_map(output_path: str) -> str:
     <div id="map"></div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        const clubs = {clubs_json};
+        const clubs = @@CLUBS_JSON@@;
         const map = L.map('map').setView([50.45, 30.52], 5);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {{maxZoom: 19}}).addTo(map);
+        L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{maxZoom: 19}}).addTo(map);
 
         const clubLayer = L.layerGroup().addTo(map);
 
@@ -214,16 +214,16 @@ def generate_club_map(output_path: str) -> str:
 
         renderMarkers();
 
-        document.getElementById('refreshBtn').addEventListener('click', function(){ renderMarkers(); document.getElementById('status').textContent='Markers refreshed'; setTimeout(()=>document.getElementById('status').textContent='','2000'); });
+        document.getElementById('refreshBtn').addEventListener('click', function(){ renderMarkers(); document.getElementById('status').textContent='Markers refreshed'; setTimeout(function(){ document.getElementById('status').textContent=''; },2000); });
 
         function showNearest(lat, lon){
-            fetch(`/clubs/nearest?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&limit=5`)
+            fetch('/clubs/nearest?lat=' + encodeURIComponent(lat) + '&lon=' + encodeURIComponent(lon) + '&limit=5')
                 .then(r => r.json())
                 .then(data => {
                     if(!data || !data.clubs) return;
                     data.clubs.forEach((cl,i)=>{
                         const circle = L.circle([cl.latitude, cl.longitude], {radius: Math.max(50, (cl.distance_km||0)*1000)}).addTo(map);
-                        circle.bindPopup(`<strong>${cl.name}</strong><br>${(cl.distance_km||0).toFixed(2)} km<br>${cl.phone||''}`);
+                        circle.bindPopup('<strong>' + (cl.name||'') + '</strong><br>' + ((cl.distance_km||0).toFixed(2)) + ' km<br>' + (cl.phone||''));
                     });
                 }).catch(e=>console.warn(e));
         }
@@ -234,7 +234,7 @@ def generate_club_map(output_path: str) -> str:
             status.textContent='Locating...';
             navigator.geolocation.getCurrentPosition(function(pos){
                 const lat = pos.coords.latitude, lon = pos.coords.longitude;
-                L.marker([lat,lon], {{icon: L.icon({iconUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png', iconSize:[25,41], iconAnchor:[12,41]})}}).addTo(map).bindPopup('You are here').openPopup();
+                L.marker([lat,lon], {{icon: L.icon({{iconUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png', iconSize:[25,41], iconAnchor:[12,41]}})}}).addTo(map).bindPopup('You are here').openPopup();
                 map.setView([lat,lon], 12);
                 showNearest(lat, lon);
                 status.textContent='';
@@ -243,6 +243,8 @@ def generate_club_map(output_path: str) -> str:
     </script>
 </body>
 </html>"""
+
+        html = html_template.replace('@@CLUBS_JSON@@', clubs_json)
 
         with open(output_path, "w", encoding="utf-8") as fh:
                 fh.write(html)
