@@ -7,7 +7,7 @@ from datetime import datetime
 import math
 from typing import Any, Dict, List, Optional, Mapping, cast, Callable
 
-from fastapi import FastAPI, UploadFile, File, Form, Depends, Request, HTTPException, Query
+from fastapi import FastAPI, UploadFile, File, Form, Depends, Request, HTTPException, Query, Header
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -20,6 +20,7 @@ from .security import require_api_key
 
 from app.data.kharkiv_clubs import CLUBS_DATA, generate_club_map
 from app.services.clubs_service import ClubsService
+from app.gateway import dispatch_clubs_nearest
 from app.models import SessionData, Rune
 from app.notion_client import NotionClient
 from app.config import NOTION_TOKEN, NOTION_SESSIONS_DB_ID
@@ -207,6 +208,25 @@ def clubs_nearest(
     svc = ClubsService()
     result = svc.nearest(lat=lat, lon=lon, limit=limit)
     return {"clubs": result}
+
+
+@app.get("/gateway/clubs/nearest")
+def gateway_clubs_nearest(
+    lat: float = Query(..., description="Latitude of the user"),
+    lon: float = Query(..., description="Longitude of the user"),
+    limit: int = Query(1, ge=1, le=50, description="Maximum number of results to return"),
+    x_use_legacy: str | None = Header(None, convert_underscores=False),
+) -> Dict[str, Any]:
+    """Gateway route to demonstrate Strangler Fig routing.
+
+    The header `X-Use-Legacy: true` forces routing to the legacy implementation.
+    Otherwise the request is routed to the modern `ClubsService`.
+    """
+    use_legacy = False
+    if x_use_legacy:
+        use_legacy = x_use_legacy.lower() in ("1", "true", "yes")
+    clubs = dispatch_clubs_nearest(lat=lat, lon=lon, limit=limit, use_legacy=use_legacy)
+    return {"clubs": clubs}
 
 
 @app.post("/clubs/map")
