@@ -1,4 +1,5 @@
 import os
+import json
 from typing import List, Dict, Any
 
 CLUBS_DATA: List[Dict[str, Any]] = [
@@ -153,15 +154,96 @@ CLUBS_DATA: List[Dict[str, Any]] = [
 ]
 
 def generate_club_map(output_path: str) -> str:
-    """Create a minimal HTML file representing the clubs map.
+        """Generate an interactive Leaflet-based HTML map of clubs.
 
-    This is a lightweight stub used for local development and smoke checks.
-    It writes a simple HTML file to `output_path` and returns that path.
-    """
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    html = """<!doctype html>
-<html><head><meta charset='utf-8'><title>Clubs Map</title></head>
-<body><h1>Kharkiv Horse Clubs (dev stub)</h1></body></html>"""
-    with open(output_path, "w", encoding="utf-8") as fh:
-        fh.write(html)
-    return output_path
+        The produced HTML includes a "Locate me" button that uses the
+        browser Geolocation API to center the map and calls the
+        `/clubs/nearest` endpoint to highlight nearby clubs.
+        """
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        # Filter only clubs with coordinates
+        clubs_with_coords = [
+                {
+                        "name": c.get("name"),
+                        "country": c.get("country"),
+                        "city": c.get("city"),
+                        "address": c.get("address"),
+                        "phone": c.get("phone"),
+                        "latitude": c.get("latitude"),
+                        "longitude": c.get("longitude"),
+                }
+                for c in CLUBS_DATA
+                if c.get("latitude") is not None and c.get("longitude") is not None
+        ]
+
+        clubs_json = json.dumps(clubs_with_coords)
+
+        html = f"""<!doctype html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width,initial-scale=1'>
+    <title>Horse Clubs Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="" crossorigin=""/>
+    <style>html,body,#map{{height:100%;margin:0;padding:0}}#map{{height:80vh}}.controls{{padding:8px;text-align:center}}</style>
+</head>
+<body>
+    <div class="controls">
+        <button id="locateBtn">Locate me</button>
+        <button id="refreshBtn">Refresh markers</button>
+        <span id="status" style="margin-left:12px;color:#666"></span>
+    </div>
+    <div id="map"></div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const clubs = {clubs_json};
+        const map = L.map('map').setView([50.45, 30.52], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {{maxZoom: 19}}).addTo(map);
+
+        const clubLayer = L.layerGroup().addTo(map);
+
+        function renderMarkers(){
+            clubLayer.clearLayers();
+            clubs.forEach(c => {
+                const m = L.marker([c.latitude, c.longitude]).addTo(clubLayer);
+                const popup = `<strong>${c.name || ''}</strong><br>${c.city || ''} ${c.country || ''}<br>${c.address || ''}<br>${c.phone || ''}`;
+                m.bindPopup(popup);
+            });
+        }
+
+        renderMarkers();
+
+        document.getElementById('refreshBtn').addEventListener('click', function(){ renderMarkers(); document.getElementById('status').textContent='Markers refreshed'; setTimeout(()=>document.getElementById('status').textContent='','2000'); });
+
+        function showNearest(lat, lon){
+            fetch(`/clubs/nearest?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&limit=5`)
+                .then(r => r.json())
+                .then(data => {
+                    if(!data || !data.clubs) return;
+                    data.clubs.forEach((cl,i)=>{
+                        const circle = L.circle([cl.latitude, cl.longitude], {radius: Math.max(50, (cl.distance_km||0)*1000)}).addTo(map);
+                        circle.bindPopup(`<strong>${cl.name}</strong><br>${(cl.distance_km||0).toFixed(2)} km<br>${cl.phone||''}`);
+                    });
+                }).catch(e=>console.warn(e));
+        }
+
+        document.getElementById('locateBtn').addEventListener('click', function(){
+            const status = document.getElementById('status');
+            if(!navigator.geolocation){ status.textContent='Geolocation not supported'; return; }
+            status.textContent='Locating...';
+            navigator.geolocation.getCurrentPosition(function(pos){
+                const lat = pos.coords.latitude, lon = pos.coords.longitude;
+                L.marker([lat,lon], {{icon: L.icon({iconUrl:'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png', iconSize:[25,41], iconAnchor:[12,41]})}}).addTo(map).bindPopup('You are here').openPopup();
+                map.setView([lat,lon], 12);
+                showNearest(lat, lon);
+                status.textContent='';
+            }, function(err){ status.textContent='Permission denied or unavailable'; console.warn(err); }, {timeout:10000});
+        });
+    </script>
+</body>
+</html>"""
+
+        with open(output_path, "w", encoding="utf-8") as fh:
+                fh.write(html)
+        return output_path
